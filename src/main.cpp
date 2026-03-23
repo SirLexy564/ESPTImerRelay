@@ -15,46 +15,23 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define ENCODER_SW 2
 #define AMBER_LED 6
 #define GREEN_LED 5
-#define RELAY_PIN 12
+#define RELAY_PIN 10
 
 int counter = 0;
-int aState;
-int aLastState;
+int state;
+int prevState;
 const int MAX_SEC = 300;
-bool update = false;
+bool update = true;
 int eeAdr = 0;
 
-
-void activate(){;}
-
-void displayCounter()
-{
-  if (update)
-  {
-  int mins = counter / 60;
-  int secs = counter % 60;
-
-  std::string time = std::to_string(mins) + ":";
-  if (secs < 10)
-  {
-    time += "0";
-  }
-  time += std::to_string(secs);
-
-  display.clearDisplay();
-  display.setCursor((SCREEN_WIDTH - (time.length() * 30)) / 2, (SCREEN_HEIGHT - 40) / 2);
-  display.print(time.c_str()); // i miss python
-  display.display();
-  update = false;
-  }
+void displayTimer(){
+    display.clearDisplay();
+    display.print("test");
+    display.display();
+    update=false;
 }
 
-void splashScreen(){ //todo
-  displayCounter();
-}
-
-void setup()
-{
+void setup(){
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
   {
     for (;;)
@@ -64,47 +41,36 @@ void setup()
   display.setTextSize(5);
   display.setTextColor(1);
 
+  pinMode(RELAY_PIN, OUTPUT);
   pinMode(ENCODER_CLK, INPUT_PULLUP);
   pinMode(ENCODER_DT, INPUT_PULLUP);
   pinMode(ENCODER_SW, INPUT_PULLUP);
-
   pinMode(AMBER_LED, OUTPUT);
   pinMode(GREEN_LED, OUTPUT);
-  pinMode(RELAY_PIN, OUTPUT);
-  
-
-  digitalWrite(AMBER_LED, HIGH);
-  digitalWrite(GREEN_LED, HIGH);
-
-  aLastState = digitalRead(ENCODER_CLK);
+  digitalWrite(AMBER_LED, LOW); //5 is default high cos JTAG
+  prevState = digitalRead(ENCODER_CLK);
 
   prefs.begin("timer", false);
-  counter = prefs.getInt("timer", 0);
-  splashScreen();
+  counter = prefs.getInt("timer",0);
+
+  displayTimer();
 }
 
-void loop()
-{
-  aState = digitalRead(ENCODER_CLK);
+void loop(){
+  state = digitalRead(ENCODER_CLK); //should do interupts
+
+  if (state != prevState && state == LOW){
+    if (digitalRead(ENCODER_DT) != state && counter <= MAX_SEC) {
+      counter++;
+      update = true;
+    } else if (counter > 0){
+      counter--;
+      update = true;
+    }
+    displayTimer();
+
+  }
+  prevState = state;
+
   
-  if (aState != aLastState && aState == LOW) {
-    if (digitalRead(ENCODER_DT) != aState) {
-      if (counter < MAX_SEC) counter++;
-    } else {
-      if (counter > 0) counter--;
-    }
-    
-    displayCounter();
-    prefs.putInt("timer", counter);
-  }
-
-  aLastState = aState;
-
-  if (digitalRead(ENCODER_SW) == LOW) {
-    delay(10);
-    if (digitalRead(ENCODER_SW) == LOW) {
-      while (digitalRead(ENCODER_SW) == LOW);
-      activate();
-    }
-  }
 }
